@@ -13,11 +13,10 @@ const createOrder = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(400).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not create order!',
+      message: err instanceof Error ? err.message : 'Could not create order!',
     });
   }
 };
-
 
 const getAllOrders = async (req: Request, res: Response) => {
   try {
@@ -30,7 +29,7 @@ const getAllOrders = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not fetch orders!',
+      message: err instanceof Error ? err.message : 'Could not fetch orders!',
     });
   }
 };
@@ -48,7 +47,7 @@ const updateOrder = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not update order!',
+      message: err instanceof Error ? err.message : 'Could not update order!',
     });
   }
 };
@@ -65,7 +64,7 @@ const softDeleteOrder = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not delete order!',
+      message: err instanceof Error ? err.message : 'Could not delete order!',
     });
   }
 };
@@ -89,7 +88,7 @@ const getOrderById = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not fetch order!',
+      message: err instanceof Error ? err.message : 'Could not fetch order!',
     });
   }
 };
@@ -98,6 +97,6 @@ export const OrderControllers = {
   createOrder,
   getAllOrders,
   getOrderById,
-  updateOrder,      // Added controller for updating orders
-  softDeleteOrder,  // Added controller for soft deletion
+  updateOrder, // Added controller for updating orders
+  softDeleteOrder, // Added controller for soft deletion
 };

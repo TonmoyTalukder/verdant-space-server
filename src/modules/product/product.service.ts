@@ -29,7 +29,7 @@ const deleteProduct = async (productId: string) => {
   const result = await Product.findOneAndUpdate(
     { productId },
     { isDeleted: true }, // Soft delete by setting isDeleted to true
-    { new: true }
+    { new: true },
   );
   if (!result) {
     throw new Error('Product not found');
@@ -42,9 +42,8 @@ const getAllProducts = async () => {
   return result;
 };
 
-
 const getProductById = async (productId: string) => {
-  const result = await Product.findOne({ productId });  // Search by productId
+  const result = await Product.findOne({ productId }); // Search by productId
   if (!result) {
     throw new Error('Product not found');
   }
@@ -52,7 +51,9 @@ const getProductById = async (productId: string) => {
 };
 
 const updateProduct = async (productId: string, payload: Partial<TProduct>) => {
-  const result = await Product.findOneAndUpdate({ productId }, payload, { new: true });
+  const result = await Product.findOneAndUpdate({ productId }, payload, {
+    new: true,
+  });
   if (!result) {
     throw new Error('Product not found');
   }
@@ -71,7 +72,6 @@ const searchProducts = async (searchTerm: string) => {
   });
   return result;
 };
-
 
 export const ProductServices = {
   createProduct,

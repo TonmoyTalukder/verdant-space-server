@@ -7,12 +7,12 @@ const createUser = async (payload: TUser) => {
 };
 
 const getAllUsers = async () => {
-  const result = await User.find({ isDeleted: false });  // Only get non-deleted users
+  const result = await User.find({ isDeleted: false }); // Only get non-deleted users
   return result;
 };
 
 const getUserById = async (id: string) => {
-  const result = await User.findOne({ _id: id, isDeleted: false });  // Exclude deleted users
+  const result = await User.findOne({ _id: id, isDeleted: false }); // Exclude deleted users
   if (!result) {
     throw new Error('User not found');
   }
@@ -21,9 +21,9 @@ const getUserById = async (id: string) => {
 
 const updateUser = async (id: string, payload: Partial<TUser>) => {
   const result = await User.findOneAndUpdate(
-    { _id: id, isDeleted: false },  // Only update if not deleted
+    { _id: id, isDeleted: false }, // Only update if not deleted
     payload,
-    { new: true }
+    { new: true },
   );
   if (!result) {
     throw new Error('User not found');
@@ -33,9 +33,9 @@ const updateUser = async (id: string, payload: Partial<TUser>) => {
 
 const deleteUser = async (id: string) => {
   const result = await User.findOneAndUpdate(
-    { _id: id },  // Find by ID regardless of deletion status
-    { isDeleted: true },  // Mark the user as deleted
-    { new: true }
+    { _id: id }, // Find by ID regardless of deletion status
+    { isDeleted: true }, // Mark the user as deleted
+    { new: true },
   );
   if (!result) {
     throw new Error('User not found');

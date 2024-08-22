@@ -6,7 +6,7 @@ async function main() {
   try {
     await mongoose.connect(config.db_url as string);
 
-    console.log("Database connected successfully."); 
+    console.log('Database connected successfully.');
 
     app.listen(config.port, () => {
       console.log(`Express app is listening on port ${config.port}`);

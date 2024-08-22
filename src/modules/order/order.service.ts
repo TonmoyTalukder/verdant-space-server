@@ -40,18 +40,17 @@ const createOrder = async (payload: TOrder) => {
   // Decrease inventory only if checkoutStatus is true
   if (order.checkoutStatus) {
     const updatedInventory = product.inventory.quantity - quantity;
-    await ProductServices.updateProduct(productId, { 
-      inventory: { 
+    await ProductServices.updateProduct(productId, {
+      inventory: {
         quantity: updatedInventory,
-        inStock: updatedInventory > 0
-      }
+        inStock: updatedInventory > 0,
+      },
     });
   }
 
   const result = await Order.create(orderWithUserDetails);
   return result;
 };
-
 
 const getOrderById = async (id: string) => {
   const result = await Order.findById(id);
@@ -62,7 +61,7 @@ const getOrderById = async (id: string) => {
 };
 
 const getAllOrders = async () => {
-  const result = await Order.find({ isDeleted: false });  // Only return non-deleted orders
+  const result = await Order.find({ isDeleted: false }); // Only return non-deleted orders
   return result;
 };
 
@@ -87,8 +86,10 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
   }
 
   // Handle checkoutStatus and adminApproval logic
-  const isCheckoutStatusChanging = order?.checkoutStatus !== updates.order?.checkoutStatus;
-  const isAdminApprovalChanging = order?.adminApproval !== updates.order?.adminApproval;
+  const isCheckoutStatusChanging =
+    order?.checkoutStatus !== updates.order?.checkoutStatus;
+  const isAdminApprovalChanging =
+    order?.adminApproval !== updates.order?.adminApproval;
 
   if (isCheckoutStatusChanging) {
     if (order?.checkoutStatus && updates.order?.checkoutStatus === false) {
@@ -101,8 +102,8 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
       }
 
       const updatedInventory = product.inventory.quantity - quantity;
-      await ProductServices.updateProduct(productId, { 
-        inventory: { 
+      await ProductServices.updateProduct(productId, {
+        inventory: {
           quantity: updatedInventory,
           inStock: updatedInventory > 0,
         },
@@ -117,8 +118,8 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
       }
 
       const updatedInventory = product.inventory.quantity - quantity;
-      await ProductServices.updateProduct(productId, { 
-        inventory: { 
+      await ProductServices.updateProduct(productId, {
+        inventory: {
           quantity: updatedInventory,
           inStock: updatedInventory > 0,
         },
@@ -140,9 +141,12 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
   return result;
 };
 
-
 const softDeleteOrder = async (id: string) => {
-  const result = await Order.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+  const result = await Order.findByIdAndUpdate(
+    id,
+    { isDeleted: true },
+    { new: true },
+  );
   if (!result) {
     throw new Error('Order not found');
   }
@@ -153,6 +157,6 @@ export const OrderServices = {
   createOrder,
   getAllOrders,
   updateOrder,
-  softDeleteOrder,  // Added service for soft delete
+  softDeleteOrder, // Added service for soft delete
   getOrderById,
 };

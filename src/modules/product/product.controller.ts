@@ -13,7 +13,7 @@ const createProduct = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not create product!',
+      message: err instanceof Error ? err.message : 'Could not create product!',
     });
   }
 };
@@ -41,12 +41,10 @@ const getAllProducts = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not fetch products!',
+      message: err instanceof Error ? err.message : 'Could not fetch products!',
     });
   }
 };
-
-
 
 const getProductByProductId = async (req: Request, res: Response) => {
   try {
@@ -61,7 +59,7 @@ const getProductByProductId = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(404).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Product not found!',
+      message: err instanceof Error ? err.message : 'Product not found!',
     });
   }
 };
@@ -87,7 +85,7 @@ const updateProduct = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not update product!',
+      message: err instanceof Error ? err.message : 'Could not update product!',
     });
   }
 };
@@ -112,7 +110,7 @@ const deleteProduct = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     res.status(500).json({
       success: false,
-      message: (err instanceof Error) ? err.message : 'Could not delete product!',
+      message: err instanceof Error ? err.message : 'Could not delete product!',
     });
   }
 };
@@ -120,7 +118,7 @@ const deleteProduct = async (req: Request, res: Response) => {
 export const ProductControllers = {
   createProduct,
   getProductByProductId,
-  getAllProducts,  // Define the getAllProducts controller
-  updateProduct,   // Define the updateProduct controller
-  deleteProduct,   // Define the deleteProduct controller
+  getAllProducts, // Define the getAllProducts controller
+  updateProduct, // Define the updateProduct controller
+  deleteProduct, // Define the deleteProduct controller
 };
