@@ -60,18 +60,28 @@ const updateProduct = async (productId: string, payload: Partial<TProduct>) => {
   return result;
 };
 
-const searchProducts = async (searchTerm: string) => {
-  const regex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+const searchProducts = async (searchTerm: string, productType?: string) => {
+  const searchWords = searchTerm.split(' ').filter(word => word); // Split and filter out empty strings
+  const regexArray = searchWords.map(word => new RegExp(word, 'i')); // Create case-insensitive regex for each word
+
+  // If 'productType' is provided, include it in the search condition
+  const typeCondition = productType ? { type: productType } : {};
+
   const result = await Product.find({
+    ...typeCondition, // Apply type filter if it exists
     $or: [
-      { name: regex },
-      { description: regex },
-      { type: regex },
-      { tags: regex },
+      { productId: { $in: regexArray } },
+      { name: { $in: regexArray } },
+      { type: { $in: regexArray } },
+      { description: { $in: regexArray } },
+      { tags: { $in: regexArray } }
     ],
+    isDeleted: false, // Only fetch products that are not soft deleted
   });
+
   return result;
 };
+
 
 export const ProductServices = {
   createProduct,
