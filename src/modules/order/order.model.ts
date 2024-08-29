@@ -1,11 +1,16 @@
 import { Schema, model } from 'mongoose';
-import { TOrder, TOrderDetails, TPayment } from './order.interface';
+import { TOrder, TOrderDetails, TPayment, TOrderProduct } from './order.interface';
 import { TUser } from '../user/user.interface';
 
 const paymentSchema = new Schema<TPayment>({
   method: { type: String, required: true },
   status: { type: String, required: true },
   price: { type: Number, required: true },
+});
+
+const orderProductSchema = new Schema<TOrderProduct>({
+  productId: { type: String, required: true },
+  quantity: { type: Number, required: true, min: 1 },
 });
 
 const orderDetailsSchema = new Schema<TOrderDetails>({
@@ -31,11 +36,10 @@ const orderSchema = new Schema<TOrder>(
   {
     userId: { type: String, required: true },
     userDetails: { type: userDetailsSchema, required: true },
-    productId: { type: String, required: true },
+    products: { type: [orderProductSchema], required: true }, // Array of products
     address: { type: String, required: true },
     payment: { type: paymentSchema, required: true },
     order: { type: orderDetailsSchema, required: true },
-    quantity: { type: Number, required: true },
     isDeleted: { type: Boolean, default: false }, // Soft delete flag
   },
   {

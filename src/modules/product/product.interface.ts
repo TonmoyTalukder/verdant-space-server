@@ -9,16 +9,18 @@ export type TInventory = {
 };
 
 export type TProduct = {
-  productId?: string; // Make this optional
+  productId?: string;
   name: string;
   description: string;
   price: number;
   image: string;
+  placeholderImages: string[]; 
   type: string;
   seasonal: string;
   rating: number;
   sale: TSale;
   tags: string[];
   inventory: TInventory;
+  orderedQuantity: number;
   isDeleted?: boolean;
 };

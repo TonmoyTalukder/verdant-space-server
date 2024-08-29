@@ -18,13 +18,14 @@ export const createProductSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   price: z.number().min(0, 'Price must be a positive number'),
   image: z.string().url('Image must be a valid URL'),
+  placeholderImages: z.array(z.string().url('Each placeholder image must be a valid URL')), // New validation added
   type: z.string().min(1, 'Type is required'),
   seasonal: z.string().optional(),
   rating: z.number().min(0).max(5, 'Rating must be between 0 and 5'),
   sale: saleSchema,
   tags: z.array(z.string()).optional(),
   inventory: inventorySchema,
-  isDeleted: z.boolean().optional(), // Add soft delete validation
+  isDeleted: z.boolean().optional(),
   insertDate: z.string().optional(),
 });
 
@@ -34,12 +35,14 @@ export const updateProductSchema = z.object({
   description: z.string().optional(),
   price: z.number().optional(),
   image: z.string().url().optional(),
+  // placeholderImages: z.array(z.string().url().optional()), // New validation added
+  placeholderImages: z.array(z.string().url()).optional(),
   type: z.string().optional(),
   seasonal: z.string().optional(),
   rating: z.number().min(0).max(5).optional(),
   sale: saleSchema.optional(),
   tags: z.array(z.string()).optional(),
   inventory: inventorySchema.optional(),
-  isDeleted: z.boolean().optional(), // Add soft delete validation
+  isDeleted: z.boolean().optional(),
   insertDate: z.string().optional(),
 });

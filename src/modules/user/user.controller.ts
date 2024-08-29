@@ -12,9 +12,9 @@ const createUser = async (req: Request, res: Response) => {
     });
   } catch (err: unknown) {
     if (err instanceof Error) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
-        message: err.message,
+        message: err.message,  // Will now return "Email already in use" if duplicate
       });
     } else {
       res.status(500).json({
@@ -24,6 +24,7 @@ const createUser = async (req: Request, res: Response) => {
     }
   }
 };
+
 
 const getAllUsers = async (req: Request, res: Response) => {
   try {
@@ -57,6 +58,38 @@ const getUserById = async (req: Request, res: Response) => {
       res.status(200).json({
         success: true,
         message: 'User by ID fetched successfully!',
+        data: result,
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'User not found!',
+      });
+    }
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Could not fetch user!',
+      });
+    }
+  }
+};
+
+const getUserByEmail = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+    const result = await UserServices.getUserByEmail(email);
+
+    if (result) {
+      res.status(200).json({
+        success: true,
+        message: 'User by Email fetched successfully!',
         data: result,
       });
     } else {
@@ -149,6 +182,7 @@ export const UserControllers = {
   createUser,
   getAllUsers,
   getUserById,
+  getUserByEmail,
   updateUser,
   deleteUser,
 };

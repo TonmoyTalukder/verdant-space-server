@@ -6,6 +6,11 @@ export type TPayment = {
   price: number;
 };
 
+export type TOrderProduct = {
+  productId: string;
+  quantity: number;
+};
+
 export type TOrderDetails = {
   status: string;
   delivery: boolean;
@@ -16,10 +21,9 @@ export type TOrderDetails = {
 export type TOrder = {
   userId: string;
   userDetails?: Omit<TUser, 'password'>;
-  productId: string;
+  products: TOrderProduct[];
   address: string;
   payment: TPayment;
   order: TOrderDetails;
-  quantity: number;
-  isDeleted: boolean; // Added field for soft deletion
+  isDeleted: boolean;
 };

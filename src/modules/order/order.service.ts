@@ -1,24 +1,15 @@
+/* eslint-disable no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { TOrder } from './order.interface';
 import { Order } from './order.model';
 import { ProductServices } from '../product/product.service';
-import { UserServices } from '../user/user.service'; // Assuming you have a UserServices
+import { UserServices } from '../user/user.service';
 
 const createOrder = async (payload: TOrder) => {
-  const { userId, productId, quantity, order } = payload;
+  const { userId, products, order } = payload;
 
-  if (!productId || !quantity) {
-    throw new Error('Product ID and quantity are required.');
-  }
-
-  // Fetch the product details
-  const product = await ProductServices.getProductById(productId);
-
-  if (!product) {
-    throw new Error('Product not found');
-  }
-
-  if (order.checkoutStatus && product.inventory.quantity < quantity) {
-    throw new Error('Insufficient product quantity');
+  if (!products || products.length === 0) {
+    throw new Error('At least one product is required.');
   }
 
   // Fetch the user details (excluding the password)
@@ -28,25 +19,40 @@ const createOrder = async (payload: TOrder) => {
   }
 
   // Exclude the password from user details
-  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
   const { password, ...userDetails } = user.toObject();
+
+  // Check product availability and update inventory if checkoutStatus is true
+  for (const { productId, quantity } of products) {
+    const product = await ProductServices.getProductById(productId);
+
+    if (!product) {
+      throw new Error(`Product with ID ${productId} not found`);
+    }
+
+    if (order.checkoutStatus && product.inventory.quantity < quantity) {
+      throw new Error(`Insufficient quantity for product ID ${productId}`);
+    }
+
+    if (order.checkoutStatus) {
+      const updatedInventory = product.inventory.quantity - quantity;
+      const updatedOrderedQuantity = product.orderedQuantity + quantity;
+
+      // Update product inventory and ordered quantity
+      await ProductServices.updateProduct(productId, {
+        inventory: {
+          quantity: updatedInventory,
+          inStock: updatedInventory > 0,
+        },
+        orderedQuantity: updatedOrderedQuantity,
+      });
+    }
+  }
 
   // Create the order with user details
   const orderWithUserDetails = {
     ...payload,
     userDetails,
   };
-
-  // Decrease inventory only if checkoutStatus is true
-  if (order.checkoutStatus) {
-    const updatedInventory = product.inventory.quantity - quantity;
-    await ProductServices.updateProduct(productId, {
-      inventory: {
-        quantity: updatedInventory,
-        inStock: updatedInventory > 0,
-      },
-    });
-  }
 
   const result = await Order.create(orderWithUserDetails);
   return result;
@@ -61,7 +67,7 @@ const getOrderById = async (id: string) => {
 };
 
 const getAllOrders = async () => {
-  const result = await Order.find({ isDeleted: false }); // Only return non-deleted orders
+  const result = await Order.find({ isDeleted: false });
   return result;
 };
 
@@ -72,20 +78,21 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
     throw new Error('Order not found');
   }
 
-  const { productId, quantity, order } = existingOrder;
+  const { products, order } = existingOrder.toObject();
 
-  if (!productId || !quantity) {
-    throw new Error('Product ID and quantity are required.');
+  if (!products || products.length === 0) {
+    throw new Error('Products are required.');
   }
 
-  // Fetch the product details
-  const product = await ProductServices.getProductById(productId);
+  // Fetch details for all products in the order
+  const productDetails = await Promise.all(
+    products.map(({ productId }) => ProductServices.getProductById(productId))
+  );
 
-  if (!product) {
-    throw new Error('Product not found');
+  if (!productDetails || productDetails.length !== products.length) {
+    throw new Error('Some products in the order were not found');
   }
 
-  // Handle checkoutStatus and adminApproval logic
   const isCheckoutStatusChanging =
     order?.checkoutStatus !== updates.order?.checkoutStatus;
   const isAdminApprovalChanging =
@@ -97,43 +104,52 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
     }
 
     if (updates.order?.checkoutStatus && updates.order?.adminApproval) {
-      if (product.inventory.quantity < quantity) {
-        throw new Error('Insufficient product quantity');
+      for (let i = 0; i < productDetails.length; i++) {
+        const product = productDetails[i];
+        const { quantity } = products[i];
+        if (!product.productId) {
+          throw new Error(`Product ID is undefined for product at index ${i}`);
+        }
+        if (product.inventory.quantity < quantity) {
+          throw new Error(`Insufficient product quantity for product ID: ${product.productId}`);
+        }
       }
 
-      const updatedInventory = product.inventory.quantity - quantity;
-      await ProductServices.updateProduct(productId, {
-        inventory: {
-          quantity: updatedInventory,
-          inStock: updatedInventory > 0,
-        },
-      });
+      // Update inventory and ordered quantities for all products
+      await Promise.all(
+        productDetails.map((product, i) => {
+          const { quantity } = products[i];
+          if (!product.productId) {
+            throw new Error(`Product ID is undefined for product at index ${i}`);
+          }
+          return ProductServices.updateProduct(product.productId as string, {
+            inventory: {
+              quantity: product.inventory.quantity - quantity,
+              inStock: product.inventory.quantity - quantity > 0,
+            },
+            orderedQuantity: product.orderedQuantity + quantity,
+          });
+        })
+      );
     }
   }
 
-  if (isAdminApprovalChanging) {
-    if (updates.order?.adminApproval) {
-      if (product.inventory.quantity < quantity) {
-        throw new Error('Insufficient product quantity');
-      }
-
-      const updatedInventory = product.inventory.quantity - quantity;
-      await ProductServices.updateProduct(productId, {
-        inventory: {
-          quantity: updatedInventory,
-          inStock: updatedInventory > 0,
-        },
-      });
-    } else if (!updates.order?.adminApproval && order?.checkoutStatus) {
-      // Reverse stock decrease if adminApproval changes to false
-      const updatedInventory = product.inventory.quantity + quantity;
-      await ProductServices.updateProduct(productId, {
-        inventory: {
-          quantity: updatedInventory,
-          inStock: updatedInventory > 0,
-        },
-      });
-    }
+  if (isAdminApprovalChanging && !updates.order?.adminApproval && order?.checkoutStatus) {
+    await Promise.all(
+      productDetails.map((product, i) => {
+        const { quantity } = products[i];
+        if (!product.productId) {
+          throw new Error(`Product ID is undefined for product at index ${i}`);
+        }
+        return ProductServices.updateProduct(product.productId as string, {
+          inventory: {
+            quantity: product.inventory.quantity + quantity,
+            inStock: product.inventory.quantity + quantity > 0,
+          },
+          orderedQuantity: product.orderedQuantity - quantity,
+        });
+      })
+    );
   }
 
   // Update the order
@@ -157,6 +173,6 @@ export const OrderServices = {
   createOrder,
   getAllOrders,
   updateOrder,
-  softDeleteOrder, // Added service for soft delete
+  softDeleteOrder,
   getOrderById,
 };
