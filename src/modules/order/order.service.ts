@@ -21,19 +21,20 @@ const createOrder = async (payload: TOrder) => {
   // Exclude the password from user details
   const { password, ...userDetails } = user.toObject();
 
-  // Check product availability and update inventory if checkoutStatus is true
-  for (const { productId, quantity } of products) {
-    const product = await ProductServices.getProductById(productId);
+  // Only update inventory if adminApproval is true
+  if (order.adminApproval) {
+    for (const { productId, quantity } of products) {
+      const product = await ProductServices.getProductById(productId);
 
-    if (!product) {
-      throw new Error(`Product with ID ${productId} not found`);
-    }
+      if (!product) {
+        throw new Error(`Product with ID ${productId} not found`);
+      }
 
-    if (order.checkoutStatus && product.inventory.quantity < quantity) {
-      throw new Error(`Insufficient quantity for product ID ${productId}`);
-    }
+      if (product.inventory.quantity < quantity) {
+        throw new Error(`Insufficient quantity for product ID ${productId}`);
+      }
 
-    if (order.checkoutStatus) {
+      // Deduct quantity from inventory
       const updatedInventory = product.inventory.quantity - quantity;
       const updatedOrderedQuantity = product.orderedQuantity + quantity;
 
@@ -58,6 +59,7 @@ const createOrder = async (payload: TOrder) => {
   return result;
 };
 
+
 const getOrderById = async (id: string) => {
   const result = await Order.findById(id);
   if (!result) {
@@ -78,78 +80,94 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
     throw new Error('Order not found');
   }
 
-  const { products, order } = existingOrder.toObject();
+  const { products: existingProducts, order: existingOrderDetails } = existingOrder.toObject();
 
-  if (!products || products.length === 0) {
-    throw new Error('Products are required.');
-  }
-
-  // Fetch details for all products in the order
+  // Fetch product details by productId (ensure this matches the correct lookup field in your Product collection)
   const productDetails = await Promise.all(
-    products.map(({ productId }) => ProductServices.getProductById(productId))
+    existingProducts.map(({ productId }) => {
+      if (!productId) throw new Error('Product ID is missing');
+      // Use productId for lookup
+      return ProductServices.getProductById(productId); // Ensure getProductById uses productId, not ObjectId
+    })
   );
 
-  if (!productDetails || productDetails.length !== products.length) {
-    throw new Error('Some products in the order were not found');
-  }
-
-  const isCheckoutStatusChanging =
-    order?.checkoutStatus !== updates.order?.checkoutStatus;
   const isAdminApprovalChanging =
-    order?.adminApproval !== updates.order?.adminApproval;
+    existingOrderDetails?.adminApproval !== updates.order?.adminApproval;
 
-  if (isCheckoutStatusChanging) {
-    if (order?.checkoutStatus && updates.order?.checkoutStatus === false) {
-      throw new Error('Once checkoutStatus is true, it cannot be undone.');
-    }
+  const isQuantityChanging = updates.products && updates.products.some((updatedProduct, index) => {
+    const existingProduct = existingProducts[index];
+    return updatedProduct.quantity !== existingProduct.quantity;
+  });
 
-    if (updates.order?.checkoutStatus && updates.order?.adminApproval) {
-      for (let i = 0; i < productDetails.length; i++) {
-        const product = productDetails[i];
-        const { quantity } = products[i];
-        if (!product.productId) {
-          throw new Error(`Product ID is undefined for product at index ${i}`);
+  // Handle adminApproval changes (both from false to true and true to false)
+  if (isAdminApprovalChanging) {
+    if (updates.order?.adminApproval) {
+      // Case: adminApproval changing from false to true (reduce stock)
+      for (const product of productDetails) {
+        const existingProduct = existingProducts.find(p => p.productId === product.productId);
+        if (!existingProduct) throw new Error('Existing product not found.');
+
+        const updatedQuantity = existingProduct.quantity;
+        const updatedInventory = product.inventory.quantity - updatedQuantity;
+
+        if (updatedInventory < 0) {
+          throw new Error(`Insufficient stock for product ID ${product.productId}`);
         }
-        if (product.inventory.quantity < quantity) {
-          throw new Error(`Insufficient product quantity for product ID: ${product.productId}`);
-        }
+
+        await ProductServices.updateProduct(product.productId!, {
+          inventory: {
+            quantity: updatedInventory,
+            inStock: updatedInventory > 0,
+          },
+          orderedQuantity: product.orderedQuantity + updatedQuantity,
+        });
       }
+    } else {
+      // Case: adminApproval changing from true to false (restore stock)
+      for (const product of productDetails) {
+        const existingProduct = existingProducts.find(p => p.productId === product.productId);
+        if (!existingProduct) throw new Error('Existing product not found.');
 
-      // Update inventory and ordered quantities for all products
-      await Promise.all(
-        productDetails.map((product, i) => {
-          const { quantity } = products[i];
-          if (!product.productId) {
-            throw new Error(`Product ID is undefined for product at index ${i}`);
-          }
-          return ProductServices.updateProduct(product.productId as string, {
-            inventory: {
-              quantity: product.inventory.quantity - quantity,
-              inStock: product.inventory.quantity - quantity > 0,
-            },
-            orderedQuantity: product.orderedQuantity + quantity,
-          });
-        })
-      );
+        const restoredQuantity = existingProduct.quantity;
+        const updatedInventory = product.inventory.quantity + restoredQuantity;
+
+        await ProductServices.updateProduct(product.productId!, {
+          inventory: {
+            quantity: updatedInventory,
+            inStock: updatedInventory > 0,
+          },
+          orderedQuantity: product.orderedQuantity - restoredQuantity,
+        });
+      }
     }
   }
 
-  if (isAdminApprovalChanging && !updates.order?.adminApproval && order?.checkoutStatus) {
-    await Promise.all(
-      productDetails.map((product, i) => {
-        const { quantity } = products[i];
-        if (!product.productId) {
-          throw new Error(`Product ID is undefined for product at index ${i}`);
+  // Handle quantity changes and adjust stock accordingly
+  if (isQuantityChanging) {
+    for (let i = 0; i < existingProducts.length; i++) {
+      const { productId, quantity: oldQuantity } = existingProducts[i];
+      const newQuantity = updates.products![i].quantity;
+
+      if (oldQuantity !== newQuantity) {
+        const product = await ProductServices.getProductById(productId);
+        if (!product) throw new Error('Product not found.');
+
+        const quantityDifference = newQuantity - oldQuantity;
+        const updatedInventory = product.inventory.quantity - quantityDifference;
+
+        if (updatedInventory < 0) {
+          throw new Error(`Insufficient stock for product ID: ${productId}`);
         }
-        return ProductServices.updateProduct(product.productId as string, {
+
+        await ProductServices.updateProduct(product.productId!, {
           inventory: {
-            quantity: product.inventory.quantity + quantity,
-            inStock: product.inventory.quantity + quantity > 0,
+            quantity: updatedInventory,
+            inStock: updatedInventory > 0,
           },
-          orderedQuantity: product.orderedQuantity - quantity,
+          orderedQuantity: product.orderedQuantity + quantityDifference,
         });
-      })
-    );
+      }
+    }
   }
 
   // Update the order
@@ -157,15 +175,40 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
   return result;
 };
 
+
 const softDeleteOrder = async (id: string) => {
+  const existingOrder = await Order.findById(id);
+
+  if (!existingOrder) {
+    throw new Error('Order not found');
+  }
+
+  // If the order was approved by admin, revert stock
+  if (existingOrder.order.adminApproval) {
+    for (const { productId, quantity } of existingOrder.products) {
+      const product = await ProductServices.getProductById(productId);
+
+      // Revert inventory
+      const updatedInventory = product.inventory.quantity + quantity;
+      const updatedOrderedQuantity = product.orderedQuantity - quantity;
+
+      await ProductServices.updateProduct(productId, {
+        inventory: {
+          quantity: updatedInventory,
+          inStock: updatedInventory > 0,
+        },
+        orderedQuantity: updatedOrderedQuantity,
+      });
+    }
+  }
+
+  // Soft delete the order
   const result = await Order.findByIdAndUpdate(
     id,
     { isDeleted: true },
     { new: true },
   );
-  if (!result) {
-    throw new Error('Order not found');
-  }
+
   return result;
 };
 
