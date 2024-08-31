@@ -82,13 +82,9 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
 
   const { products: existingProducts, order: existingOrderDetails } = existingOrder.toObject();
 
-  // Fetch product details by productId (ensure this matches the correct lookup field in your Product collection)
+  // Fetch current product details
   const productDetails = await Promise.all(
-    existingProducts.map(({ productId }) => {
-      if (!productId) throw new Error('Product ID is missing');
-      // Use productId for lookup
-      return ProductServices.getProductById(productId); // Ensure getProductById uses productId, not ObjectId
-    })
+    existingProducts.map(({ productId }) => ProductServices.getProductById(productId))
   );
 
   const isAdminApprovalChanging =
@@ -98,6 +94,33 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
     const existingProduct = existingProducts[index];
     return updatedProduct.quantity !== existingProduct.quantity;
   });
+
+  // Handle removal of products from the order when adminApproval is true
+  if (updates.products && updates.products.length < existingProducts.length) {
+    const removedProducts = existingProducts.filter(
+      existingProduct =>
+        !updates.products!.some(updatedProduct => updatedProduct.productId === existingProduct.productId)
+    );
+
+    if (existingOrderDetails.adminApproval) {
+      for (const removedProduct of removedProducts) {
+        const product = await ProductServices.getProductById(removedProduct.productId);
+        if (!product) throw new Error(`Product with ID ${removedProduct.productId} not found`);
+
+        // Revert inventory for removed products if adminApproval is true
+        const restoredInventory = product.inventory.quantity + removedProduct.quantity;
+        const restoredOrderedQuantity = product.orderedQuantity - removedProduct.quantity;
+
+        await ProductServices.updateProduct(removedProduct.productId, {
+          inventory: {
+            quantity: restoredInventory,
+            inStock: restoredInventory > 0,
+          },
+          orderedQuantity: restoredOrderedQuantity,
+        });
+      }
+    }
+  }
 
   // Handle adminApproval changes (both from false to true and true to false)
   if (isAdminApprovalChanging) {
@@ -176,6 +199,7 @@ const updateOrder = async (orderId: string, updates: Partial<TOrder>) => {
 };
 
 
+
 const softDeleteOrder = async (id: string) => {
   const existingOrder = await Order.findById(id);
 
@@ -183,10 +207,12 @@ const softDeleteOrder = async (id: string) => {
     throw new Error('Order not found');
   }
 
-  // If the order was approved by admin, revert stock
+  // If the order was approved by admin, revert stock for all ordered products
   if (existingOrder.order.adminApproval) {
     for (const { productId, quantity } of existingOrder.products) {
       const product = await ProductServices.getProductById(productId);
+
+      if (!product) throw new Error(`Product with ID ${productId} not found`);
 
       // Revert inventory
       const updatedInventory = product.inventory.quantity + quantity;
@@ -206,7 +232,7 @@ const softDeleteOrder = async (id: string) => {
   const result = await Order.findByIdAndUpdate(
     id,
     { isDeleted: true },
-    { new: true },
+    { new: true }
   );
 
   return result;
