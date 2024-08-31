@@ -9,7 +9,7 @@ const app: Application = express();
 app.use(express.json());
 
 // Handle CORS for requests
-const allowedOrigins = ['https://verdantspace.vercel.app', 'http://localhost:3000', 'https://verdant-space.vercel.app/'];
+const allowedOrigins = ['https://verdantspace.vercel.app', 'http://localhost:3000', 'https://verdant-space.vercel.app'];
 
 app.use(cors({
   origin: allowedOrigins,  // Allow specific domains
